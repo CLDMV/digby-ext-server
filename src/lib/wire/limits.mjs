@@ -76,7 +76,11 @@ export function frameTcp(message) {
 
 /**
  * Split a TCP byte stream into length-prefixed messages. Incomplete data stays buffered until more arrives; the buffer never
- * holds more than one partial frame (at most 65537 octets) between calls.
+ * holds more than one partial frame (at most 65537 octets) between calls. Once a frame's length prefix is known, a buffer is
+ * started at the size of what has actually arrived (a small floor) and doubles up to the frame's declared length as the rest
+ * arrives — so a frame delivered one octet at a time stays amortised-linear (one copy per octet, plus the doubling copies),
+ * and a stalled frame pins kilobytes, not its full 64 KB. Completed frames are always a fresh buffer: a copy of the caller's
+ * chunk, never a view into it, and never framer state a later push would overwrite.
  *
  * @example
  * const frames = new TcpFramer();
@@ -84,8 +88,16 @@ export function frameTcp(message) {
  */
 export class TcpFramer {
 	constructor() {
-		/** @type {Uint8Array} */
-		this.pending = new Uint8Array(0);
+		/** Prefix octets of the next frame held so far (0 or 1 of the 2 the length needs). @type {Uint8Array} */
+		this.prefix = new Uint8Array(0);
+		/** The frame being filled, once its length prefix is known; null until then. @type {Uint8Array|null} */
+		this.frame = null;
+		/** The frame's declared length from its prefix. */
+		this.len = 0;
+		/** Payload octets already copied into {@link TcpFramer#frame}. */
+		this.filled = 0;
+		/** Allocated size of {@link TcpFramer#frame}; grows by doubling up to {@link TcpFramer#len}. */
+		this.cap = 0;
 	}
 
 	/**
@@ -95,27 +107,93 @@ export class TcpFramer {
 	 */
 	push(chunk) {
 		const add = asBytes(chunk);
-		let buf;
-		if (this.pending.length === 0) buf = add;
-		else {
-			buf = new Uint8Array(this.pending.length + add.length);
-			buf.set(this.pending);
-			buf.set(add, this.pending.length);
-		}
 		const out = [];
 		let pos = 0;
-		while (buf.length - pos >= 2) {
-			const len = (buf[pos] << 8) | buf[pos + 1];
-			if (buf.length - pos - 2 < len) break;
-			out.push(buf.slice(pos + 2, pos + 2 + len));
+		// A frame whose length is known continues with whatever this chunk starts with.
+		if (this.frame !== null) {
+			pos = this.#fill(add, 0, out);
+		} else if (this.prefix.length === 1 && add.length > 0) {
+			// one held prefix octet plus the chunk's first octet complete the length prefix
+			this.#begin((this.prefix[0] << 8) | add[0], add.length + 1);
+			pos = this.#fill(add, 1, out);
+		}
+		// Whole frames contained in the rest of the chunk: one exact-size copy each.
+		while (add.length - pos >= 2) {
+			const len = (add[pos] << 8) | add[pos + 1];
+			if (add.length - pos - 2 < len) break;
+			out.push(add.slice(pos + 2, pos + 2 + len));
 			pos += 2 + len;
 		}
-		this.pending = buf.slice(pos);
+		// Whatever remains is the start of one frame: either a lone prefix octet, or a known length to start filling.
+		const rest = add.length - pos;
+		if (rest > 0) {
+			if (rest === 1) this.prefix = add.slice(pos, pos + 1);
+			else {
+				this.#begin((add[pos] << 8) | add[pos + 1], rest);
+				this.#fill(add, pos + 2, out);
+			}
+		}
 		return out;
+	}
+
+	/**
+	 * Start a frame of `len` octets, `received` of which (prefix included) have already arrived. The buffer holds only what
+	 * has arrived — a small floor at first — and doubles up to `len` as the rest arrives, so a stalled frame pins kilobytes,
+	 * not its full 64 KB (segment sizes are client-controlled; 2,000 connections each stalling after the prefix would
+	 * otherwise pin ~131 MB).
+	 * @param {number} len - the frame's declared length
+	 * @param {number} received - frame octets (prefix included) received so far
+	 */
+	#begin(len, received) {
+		this.len = len;
+		this.cap = Math.min(len, Math.max(4096, received));
+		this.frame = new Uint8Array(this.cap);
+		this.filled = 0;
+		this.prefix = new Uint8Array(0);
+	}
+
+	/**
+	 * Copy `add[start..]` into the frame being filled, doubling the buffer when it runs out of room, and completing and
+	 * emitting the frame when full.
+	 * @param {Uint8Array} add - the chunk being pushed
+	 * @param {number} start - the offset in `add` where the frame's next payload octet sits
+	 * @param {Uint8Array[]} out - completed frames are pushed here
+	 * @returns {number} the offset in `add` after the octets consumed
+	 */
+	#fill(add, start, out) {
+		let pos = start;
+		while (this.frame !== null && pos < add.length && this.filled < this.len) {
+			if (this.filled === this.cap) {
+				this.cap = Math.min(this.len, this.cap * 2);
+				const grown = new Uint8Array(this.cap);
+				grown.set(this.frame.subarray(0, this.filled));
+				this.frame = grown;
+			}
+			const take = Math.min(this.cap - this.filled, add.length - pos);
+			this.frame.set(add.subarray(pos, pos + take), this.filled);
+			this.filled += take;
+			pos += take;
+		}
+		if (this.frame !== null && this.filled === this.len) {
+			out.push(this.frame);
+			this.frame = null;
+			this.filled = 0;
+			this.cap = 0;
+		}
+		return pos;
 	}
 
 	/** Octets held for an incomplete frame. */
 	get buffered() {
-		return this.pending.length;
+		return this.prefix.length + (this.frame !== null ? 2 + this.filled : 0);
+	}
+
+	/**
+	 * Diagnostic: octets currently allocated for the frame being filled (0 when no frame is in flight). Starts at a small
+	 * floor regardless of the declared length and doubles up to that length as payload arrives, so a stalled connection does
+	 * not pin the full frame size.
+	 */
+	get capacity() {
+		return this.cap;
 	}
 }
