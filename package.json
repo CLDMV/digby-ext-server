@@ -24,8 +24,18 @@
 	"files": ["src/", "sql/", "docs/", "rummage.manifest.mjs", "LICENSE", "README.md"],
 	"scripts": {
 		"generate": "rummage generate",
-		"generate:check": "rummage check"
+		"generate:check": "rummage check",
+		"build": "npm pack --dry-run --ignore-scripts",
+		"build:ci": "npm run build",
+		"test": "node tests/run-vitest.mjs",
+		"coverage": "node tests/run-vitest.mjs --coverage-quiet",
+		"ci:coverage": "npm run coverage"
 	},
 	"peerDependencies": { "@cldmv/rummage": "^0.1.0" },
-	"devDependencies": { "@cldmv/rummage": "workspace:*" }
+	"devDependencies": {
+		"@cldmv/rummage": "workspace:*",
+		"@cldmv/vitest-runner": "^1.8.0",
+		"@vitest/coverage-v8": "^5.1.1",
+		"vitest": "^5.1.1"
+	}
 }
