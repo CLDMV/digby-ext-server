@@ -103,7 +103,7 @@ export function decodeMessage(input, options) {
 	// count of newly materialised name octets against the cap.
 	r.nameMemo = new Map();
 	r.nameOctets = 0;
-	r.maxNameOctets = maxNameOctets;
+	r.maxNameOctets = o.maxNameOctets ?? MAX_NAME_OCTETS;
 
 	const questions = [];
 	for (let i = 0; i < qd; i++) {
