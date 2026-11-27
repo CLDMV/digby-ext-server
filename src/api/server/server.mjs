@@ -25,6 +25,14 @@ export function activate(context) {
 	// cross-extension call into our settings leaves.
 	setupSettings({ settings: _settingsSchema, scope: context.storage, extId: context.extId });
 
+	// The DNS wire codec lives in @cldmv/digby-ext-wire (CLDMV/digby#42) and the manifest
+	// requires it, so its surface is mounted and activated BEFORE this leaf runs. `self` is
+	// in-call-only — activate is a call, so this is the one place `self.wire` resolves; touch
+	// it so a missing / unmounted wire surface fails fast here at mount time. Server's own
+	// wire consumers (transfer, dnssec, resolver, public) capture the surface from their own
+	// entry points when they wire up — this is deliberately the minimal capture, no seam.
+	void self.wire;
+
 	// Reading own settings (fast — the storage tier directly, no access check for self):
 	// const theme = await context.storage.settings.get("theme");
 	// Reading own custom tables:
