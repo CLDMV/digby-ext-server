@@ -27,9 +27,13 @@
  *   required           true if the user must not be able to disable it
  *   platforms          ["desktop"] etc. — omit to activate everywhere
  *   server.attach      an exports subpath exporting attachServer(app, host), for web
+ *   requires           EXTENSION package names the loader mounts and activates BEFORE this one
  */
 
 export default {
 	protocol: { version: "1.0" },
-	i18n: { prefix: "server" }
+	i18n: { prefix: "server" },
+	// The DNS wire codec lives in the wire extension; the root leaf's activate() touches
+	// the captured surface (self.wire) at mount time. Built by CLDMV/digby#42.
+	requires: ["@cldmv/digby-ext-wire"]
 };

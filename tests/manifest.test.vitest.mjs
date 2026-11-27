@@ -11,4 +11,8 @@ describe("rummage.manifest.mjs", () => {
 		expect(manifest.protocol).toEqual({ version: "1.0" });
 		expect(manifest.i18n).toEqual({ prefix: "server" });
 	});
+
+	it("requires the wire extension — the codec moved there (CLDMV/digby#42)", () => {
+		expect(manifest.requires).toEqual(["@cldmv/digby-ext-wire"]);
+	});
 });
