@@ -31,6 +31,7 @@
 		"coverage": "node tests/run-vitest.mjs --coverage-quiet",
 		"ci:coverage": "npm run coverage"
 	},
+	"dependencies": { "@cldmv/digby-ext-wire": "workspace:*" },
 	"peerDependencies": { "@cldmv/rummage": "^0.1.0" },
 	"devDependencies": {
 		"@cldmv/rummage": "workspace:*",
