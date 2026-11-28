@@ -17,8 +17,6 @@ import { settings as _settingsSchema } from "../../../sql/settings.mjs";
 // import { eq } from "@cldmv/rummage/storage";
 // import { someTable } from "../../../sql/schema.mjs";
 
-export const name = "server";
-
 export function activate(context) {
 	// Wire this extension's settings declaration to its storage scope so the
 	// sibling leaves at src/api/server/settings/*.mjs can resolve what they

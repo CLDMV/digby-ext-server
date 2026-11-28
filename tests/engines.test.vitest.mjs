@@ -45,6 +45,9 @@ function findSlothlet() {
 	}
 }
 
+/** The floor a rummage extension declares: slothlet-based packages run on Node 24, and 24.15 exists only on the dev2 line. */
+const EXTENSION_FLOOR = [24, 15, 0];
+
 describe("engines.node", () => {
 	it("is not below the floor of @cldmv/slothlet (a transitive runtime dependency via @cldmv/rummage)", () => {
 		const own = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
@@ -53,5 +56,13 @@ describe("engines.node", () => {
 		const ownFloor = floorOf(own.engines.node);
 		const dependencyFloor = floorOf(slothlet.engines.node);
 		expect(compare(ownFloor, dependencyFloor), `engines.node ${own.engines.node} vs slothlet ${slothlet.engines.node}`).toBeGreaterThanOrEqual(0);
+	});
+
+	it("declares >= 24.15.0 on BOTH engines and devEngines — the rummage-extension floor (CLDMV/digby#42)", () => {
+		const own = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+		expect(own.engines?.node, "engines.node is declared").toBeTruthy();
+		expect(own.devEngines?.runtime?.version, "devEngines.runtime.version is declared").toBeTruthy();
+		expect(compare(floorOf(own.engines.node), EXTENSION_FLOOR), `engines.node ${own.engines.node} must be >= 24.15.0`).toBeGreaterThanOrEqual(0);
+		expect(compare(floorOf(own.devEngines.runtime.version), EXTENSION_FLOOR), `devEngines.runtime.version ${own.devEngines.runtime.version} must be >= 24.15.0`).toBeGreaterThanOrEqual(0);
 	});
 });
