@@ -31,5 +31,9 @@
 
 export default {
 	protocol: { version: "1.0" },
-	i18n: { prefix: "server" }
+	i18n: { prefix: "server" },
+	// The DNS wire codec lives in the wire extension (CLDMV/digby#42): the loader mounts and activates it
+	// BEFORE this one, and the root leaf's activate() reads self.wire (imported from @cldmv/rummage/runtime)
+	// and throws unless self.wire.decode is a function — a missing or unpublished wire surface fails the mount.
+	requires: ["@cldmv/digby-ext-wire"]
 };
