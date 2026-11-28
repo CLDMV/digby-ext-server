@@ -36,7 +36,7 @@ export function activate(context) {
 		wire = self.wire;
 	} catch (err) {
 		throw new Error(
-			`digby-ext-server requires the @cldmv/digby-ext-wire extension — reaching its surface failed (${err?.message ?? err}). Is wire in the app, and does this package declare it in its package.json dependencies?`
+			`digby-ext-server requires the @cldmv/digby-ext-wire extension — reading its surface (self.wire.decode) failed (${err?.message ?? err}). Is wire in the app, and does this package declare it in its package.json dependencies?`
 		);
 	}
 	if (typeof wire?.decode !== "function") {
