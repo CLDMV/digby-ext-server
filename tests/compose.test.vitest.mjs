@@ -44,11 +44,13 @@ beforeAll(async () => {
 }, 300_000);
 afterAll(() => t?.close());
 
-/** Where the host composed server — first-party (`server`) or third-party (`ext.<app>.server`). */
+/** Where the host composed server — first-party (`server`) or third-party (`ext.<app>.server`). Probed on `.activate`, the
+ * root leaf's real export: `.name` sat on a root export that always answered (a function node's own `name`, or the
+ * removed `export const name`), so it proved nothing (CLDMV/digby#42 C3-4). */
 const mount = () =>
 	["server", "ext.digby.server", "ext.server"].find((p) => {
 		try {
-			return t.leaf(`${p}.name`) !== undefined;
+			return t.leaf(`${p}.activate`) !== undefined;
 		} catch {
 			return false;
 		}
